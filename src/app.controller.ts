@@ -1,85 +1,24 @@
 import {
   Controller,
   Get,
-  HttpStatus,
-  ParseFilePipeBuilder,
+  Request,
   Post,
-  UploadedFile,
-  UploadedFiles,
-  UseInterceptors,
+  UseGuards,
+  Body,
+  Req,
+  Res,
 } from '@nestjs/common';
-import {
-  AnyFilesInterceptor,
-  File,
-  FileInterceptor,
-} from '@nest-lab/fastify-multer';
-import { AppService } from './app.service';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthService } from './auth/auth.service';
+import { Public } from './auth/public.decorator';
+import { FastifyReply, FastifyRequest } from 'fastify';
+
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private authService: AuthService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
-
-  //many files
-  @Post('upload')
-  @UseInterceptors(
-    AnyFilesInterceptor({
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, callback) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          const filename = `${uniqueSuffix}${ext}`;
-          callback(null, filename);
-        },
-      }),
-      limits: {
-        files: 1,
-        fileSize: 1024 * 1024 * 5, // 5MB
-      },
-    }),
-  )
-  async uploadFile(@UploadedFiles() files: any) {
-    console.log(files);
-  }
-  //a file
-  @Post('/file')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, callback) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          const filename = `${'uniqueSuffix'}${ext}`;
-          callback(null, filename);
-        },
-      }),
-    }),
-  )
-  handleUpload(
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({
-          fileType: 'jpeg',
-        })
-        .addMaxSizeValidator({
-          maxSize: 1000,
-        })
-        .build({
-          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
-        }),
-    )
-    file: File,
-  ) {
-    console.log('file', file);
-    return 'File upload API';
+  @Get('profile')
+  getProfile(@Request() req) {
+    return { success: 'user' };
   }
 }
