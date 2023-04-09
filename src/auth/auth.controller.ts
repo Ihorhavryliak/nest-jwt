@@ -49,7 +49,6 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Get('refresh-token')
   async refreshToken(@Req() request: FastifyRequest) {
-    const token = request.cookies['jwt'];
-    return this.authService.refreshToken(token);
+    return this.authService.refreshToken(request);
   }
 }
