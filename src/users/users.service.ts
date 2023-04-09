@@ -1,24 +1,100 @@
-import { Injectable } from '@nestjs/common';
-
-// This should be a real class/interface representing a user entity
-export type User = any;
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { UserDto } from './dto/users.dto';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
-  private readonly users = [
-    {
-      userId: 1,
-      username: 'john',
-      password: 'changeme',
-    },
-    {
-      userId: 2,
-      username: 'maria',
-      password: 'guess',
-    },
-  ];
+  constructor(private prisma: PrismaService) {}
 
-  async findOne(username: string): Promise<User | undefined> {
-    return this.users.find((user) => user.username === username);
+  async create(dto: UserDto): Promise<DataTokenType> {
+    const isUser = await this.findUser(dto.email);
+    if (isUser)
+      throw new HttpException(
+        { success: false, message: 'Conflict' },
+        HttpStatus.CONFLICT,
+      );
+
+    const password = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user
+      .create({
+        data: {
+          email: dto.email,
+          password,
+        },
+      })
+      .catch((error) => {
+        if (error instanceof PrismaClientKnownRequestError) {
+          if (error.code === 'P2002') {
+            throw new ForbiddenException({
+              success: false,
+              message: 'Credentials incorrect',
+            });
+          }
+        }
+        throw error;
+      });
+
+    return { sub: user.id, email: user.email };
+  }
+  async login(dto: UserDto): Promise<DataTokenType> {
+    //find user
+    const user = await this.findUser(dto.email);
+    // check is user
+    if (!user) {
+      throw new HttpException(
+        { success: false, message: 'Unauthorized' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    //compare password
+    const matchPassword = await bcrypt.compare(dto.password, user.password);
+    if (!matchPassword) {
+      throw new HttpException(
+        { success: false, message: 'Unauthorized' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    return { sub: user.id, email: user.email };
+  }
+  async refresh(email: string): Promise<DataTokenType> {
+    //find user
+    const user = await this.findUser(email);
+    // check is user
+    if (!user) {
+      throw new HttpException(
+        { success: false, message: 'Unauthorized' },
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    return { sub: user.id, email: user.email };
+  }
+
+  async findUser(email: string): Promise<UserDto> {
+    //find user
+    const user = (await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+    })) as UserDto;
+    //check
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return user;
   }
 }
+
+export type Token = {
+  accessToken: string;
+};
+
+export type DataTokenType = { sub: number; email: string };

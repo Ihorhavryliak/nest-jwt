@@ -6,6 +6,7 @@ import {
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { UserDto } from 'src/users/dto/users.dto';
 
 @Injectable()
 export class AuthService {
@@ -14,49 +15,60 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async singUp(user: any, response: FastifyReply) {
-    const payload = { username: user.username, sub: user.userId };
-    const accessToken = {
-      access_token: this.jwtService.sign(payload, {
-        secret: process.env.JWT_ACCESS_SECRET,
-        expiresIn: process.env.JWT_ACCESS_EXPIRE,
-      }),
-    };
-    response.setCookie(
-      'jwt',
-      this.jwtService.sign(payload, {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_EXPIRE,
-      }),
-      {
-        httpOnly: true,
-        /* secure: true, */
-        /* sameSite: 'strict', */ //test
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      },
-    );
-    return accessToken;
+  async singUp(user: UserDto, response: FastifyReply) {
+    try {
+      //check  is user and get sub id and email
+      const dataUser = await this.usersService.create(user);
+      //create token
+      const accessToken = {
+        access_token: this.jwtService.sign(dataUser, {
+          secret: process.env.JWT_ACCESS_SECRET,
+          expiresIn: process.env.JWT_ACCESS_EXPIRE,
+        }),
+      };
+      //set cookie with refresh token
+      const maxAge = +process.env.JWT_REFRESH_ACCESS_EXPIRE;
+      response.setCookie(
+        'jwt',
+        this.jwtService.sign(dataUser, {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: process.env.JWT_REFRESH_ACCESS_EXPIRE,
+        }),
+        {
+          httpOnly: true,
+          // secure: true,
+          // sameSite: 'strict',
+          maxAge,
+        },
+      );
+      return accessToken;
+    } catch (error) {
+      throw error;
+    }
   }
 
-  async login(user: any, response: FastifyReply) {
-    const payload = { username: user.username, sub: user.userId };
+  async login(user: UserDto, response: FastifyReply) {
+    const dataUser = await this.usersService.login(user);
+    //create token
     const accessToken = {
-      access_token: this.jwtService.sign(payload, {
+      access_token: this.jwtService.sign(dataUser, {
         secret: process.env.JWT_ACCESS_SECRET,
         expiresIn: process.env.JWT_ACCESS_EXPIRE,
       }),
     };
+    //set cookie with refresh token
+    const maxAge = +process.env.JWT_REFRESH_ACCESS_EXPIRE;
     response.setCookie(
       'jwt',
-      this.jwtService.sign(payload, {
+      this.jwtService.sign(dataUser, {
         secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: process.env.JWT_REFRESH_EXPIRE,
+        expiresIn: process.env.JWT_REFRESH_ACCESS_EXPIRE,
       }),
       {
         httpOnly: true,
-        /* secure: true, */
-        /* sameSite: 'strict', */ //test
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        // secure: true,
+        // sameSite: 'strict',
+        maxAge,
       },
     );
     return accessToken;
@@ -76,34 +88,49 @@ export class AuthService {
       const message = { message: 'Cookie cleared' };
       return message;
     } catch (error) {
-      console.log(error);
-      throw new UnauthorizedException({ error });
+      throw error;
     }
   }
 
   async refreshToken(request: FastifyRequest) {
     try {
+      //get token from cookie
       const tokenCookie = request.cookies['jwt'];
       if (!tokenCookie) {
         throw new ForbiddenException();
       }
-      const userData: { name: string } = this.jwtService.verify(tokenCookie, {
-        secret: process.env.JWT_REFRESH_SECRET,
-      });
-      if (!userData) {
+      // Decode the token (without verification)
+      const decoded: any = this.jwtService.decode(tokenCookie);
+      // Check if the token has expired
+      const isExpired = decoded.exp && Date.now() >= decoded.exp * 1000;
+      if (isExpired) {
+        throw new ForbiddenException({
+          success: false,
+          message: 'Token is expired',
+        });
+      }
+      //decode
+      const userDataDecode: { email: string } = await this.jwtService.verify(
+        tokenCookie,
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+        },
+      );
+      if (!userDataDecode) {
         throw new ForbiddenException();
       }
-      const payload = { username: userData.name };
+      //get user
+      const dataUser = await this.usersService.refresh(userDataDecode.email);
+      //create token
       const accessToken = {
-        access_token: this.jwtService.sign(payload, {
+        access_token: this.jwtService.sign(dataUser, {
           secret: process.env.JWT_ACCESS_SECRET,
           expiresIn: process.env.JWT_REFRESH_EXPIRE,
         }),
       };
       return accessToken;
     } catch (error) {
-      console.log(error);
-      throw new UnauthorizedException({ error });
+      throw error;
     }
   }
 }
