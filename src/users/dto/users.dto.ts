@@ -8,8 +8,7 @@ export class UserDto {
   @IsNotEmpty()
   @IsString()
   password: string;
-  role: string;
-  status: string[];
+  roles: string[];
   information: string[];
   city: string;
 }

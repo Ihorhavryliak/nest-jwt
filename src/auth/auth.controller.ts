@@ -9,9 +9,11 @@ import {
   Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Public } from './public.decorator';
+import { Public } from './decorator/public.decorator';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UserDto } from 'src/users/dto/users.dto';
+import { Roles } from './decorator/roles.decorator';
+import { Role } from './enum/role.enum';
 
 @Controller()
 export class AuthController {
@@ -54,6 +56,7 @@ export class AuthController {
   }
 
   @Get('file')
+  @Roles(Role.User)
   async file(@Req() request: FastifyRequest) {
     return { file: 'file' };
   }

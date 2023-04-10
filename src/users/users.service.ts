@@ -43,7 +43,7 @@ export class UsersService {
         throw error;
       });
 
-    return { sub: user.id, email: user.email };
+    return { sub: user.id, email: user.email, roles: user.roles };
   }
   async login(dto: UserDto): Promise<DataTokenType> {
     //find user
@@ -63,7 +63,7 @@ export class UsersService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    return { sub: user.id, email: user.email };
+    return { sub: user.id, email: user.email, roles: user.roles };
   }
   async refresh(email: string): Promise<DataTokenType> {
     //find user
@@ -75,7 +75,7 @@ export class UsersService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    return { sub: user.id, email: user.email };
+    return { sub: user.id, email: user.email, roles: user.roles };
   }
 
   async findUser(email: string): Promise<UserDto> {
@@ -97,4 +97,4 @@ export type Token = {
   accessToken: string;
 };
 
-export type DataTokenType = { sub: number; email: string };
+export type DataTokenType = { sub: number; email: string; roles: string[] };

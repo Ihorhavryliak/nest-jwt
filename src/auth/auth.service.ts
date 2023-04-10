@@ -7,6 +7,7 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { UserDto } from 'src/users/dto/users.dto';
+import { DecodedJwtType } from './guard/roles.guard';
 
 @Injectable()
 export class AuthService {
@@ -100,7 +101,7 @@ export class AuthService {
         throw new ForbiddenException();
       }
       // Decode the token (without verification)
-      const decoded: any = this.jwtService.decode(tokenCookie);
+      const decoded = this.jwtService.decode(tokenCookie) as DecodedJwtType;
       // Check if the token has expired
       const isExpired = decoded.exp && Date.now() >= decoded.exp * 1000;
       if (isExpired) {
