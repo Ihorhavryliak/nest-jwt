@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesGuard } from './auth/guard/roles.guard';
 import { JwtService } from '@nestjs/jwt';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -14,12 +15,23 @@ import { JwtService } from '@nestjs/jwt';
       isGlobal: true,
       cache: true,
     }),
+    ThrottlerModule.forRootAsync({
+      useFactory: async () => ({
+        ttl: 60,
+        limit: 10,
+      }),
+    }),
     AuthModule,
     UsersModule,
     PrismaModule,
   ],
   controllers: [],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
